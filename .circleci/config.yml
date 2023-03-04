@@ -173,6 +173,51 @@ jobs:
       - destroy-environment:
           workflow_id: ${CIRCLE_WORKFLOW_ID:0:7}
           
+  run-migrations:
+    docker:
+      # Docker image here that supports NodeJS
+      - image: cimg/python:3.10
+
+    steps:
+      # Checkout code from git
+      - checkout
+      - run:
+          name: Install AWS CLI
+          command: |
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            sudo ./aws/install
+      - run:
+          name: Install Node.js 18.0.0
+          command: |
+            # Install Node.js LTS version as our base Node.js version
+            curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+            sudo apt install -y nodejs
+            # Use n version manager to use Node.js v13.8.0
+            sudo npm install --global n
+            sudo n 18.0.0 
+      - restore_cache:
+          keys: [backend-build]
+      - run:
+          name: migrate
+          command: |
+            cd backend
+            sudo npm install -g npm
+            npm run migrations > migrations_dump.txt
+            cat migrations_dump.txt
+      - run:
+          name: Send migration res to KVDB.io
+          command: |
+              # Your code here
+              if grep -q "has been executed successfully." ~/project/backend/migrations_dump.txt
+              then
+                # If you are using kvdb.io, generate the bucket ID "V2irXAbV4Tug9xuTH171yn" in your local terminal first
+                curl https://kvdb.io/V2irXAbV4Tug9xuTH171yn/migration_${CIRCLE_WORKFLOW_ID:0:7}  -d '1' 
+              fi
+      # Here's where you will add some code to rollback on failure
+      - destroy-environment:
+          workflow_id: ${CIRCLE_WORKFLOW_ID:0:7}
+          
           
 workflows:
   default:
@@ -191,3 +236,5 @@ workflows:
           requires: [test-frontend, test-backend, scan-frontend, scan-backend]
       - configure-infrastructure:
           requires: [deploy-infrastructure]
+      - run-migrations:
+          requires: [configure-infrastructure]
