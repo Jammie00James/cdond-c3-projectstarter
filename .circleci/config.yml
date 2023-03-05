@@ -221,6 +221,7 @@ jobs:
       # Here's where you will add some code to rollback on failure
       - destroy-environment:
           workflow_id: ${CIRCLE_WORKFLOW_ID:0:7}
+          
   deploy-frontend:
     docker:
       # Docker image here that supports AWS CLI
@@ -287,8 +288,75 @@ jobs:
       # Here's where you will add some code to rollback on failure
       - destroy-environment:
           workflow_id: ${CIRCLE_WORKFLOW_ID:0:7}
-          
-          
+
+  deploy-backend:
+    docker:
+      # Docker image here that supports Ansible
+      - image: alpine:3.12.0
+    steps:
+      # Checkout code from git
+      - checkout
+      # Add ssh keys with fingerprint
+      - add_ssh_keys:
+          fingerprints:
+            - "ef:b6:01:0b:cb:a0:75:d6:22:d2:4c:be:76:d2:5f:e3"
+      - run:
+          name: Install dependencies
+          command: |
+            # your code here
+            apk update
+      - run:
+          name: Install tar utility
+          command: |
+            apk add --update tar gzip
+      # attach workspace
+      - attach_workspace:
+          at: ~/
+      - run:
+          name: Install python
+          command: |
+            # your code here
+            apk add --update python3
+      # install ansible
+      - run:
+          name: Install ansible
+          command: |
+            # your code here
+            apk add --update ansible
+      # install NodeJS and NPM
+      - run:
+          name: Install NodeJS and NPM
+          command: |
+            # your code here
+            apk add nodejs-current npm
+            node --version
+            npm --version
+      # install aws cli
+      - run:
+          name: Install aws cli
+          command: |
+            # your code here
+            apk add --no-cache aws-cli
+      - run:
+          name: Deploy backend
+          command: |
+            # your code here
+            cd backend
+            npm i
+            npm run build
+            cd ..
+            # Zip the directory
+            tar -C backend -czvf artifact.tar.gz .
+            cd .circleci/ansible
+            echo "Contents  of the inventory.txt file is -------"
+            cat inventory.txt
+            printenv | grep TYPEORM_
+            ansible-playbook -i inventory.txt deploy-backend.yml
+      # Here's where you will add some code to rollback on failure
+      - destroy-environment:
+          workflow_id: ${CIRCLE_WORKFLOW_ID:0:7}
+
+         
 workflows:
   default:
     jobs:
@@ -309,4 +377,6 @@ workflows:
       - run-migrations:
           requires: [configure-infrastructure]
       - deploy-frontend:
+          requires: [run-migrations]
+      - deploy-backend:
           requires: [run-migrations]
