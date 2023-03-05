@@ -42,6 +42,10 @@ jobs:
             cd backend
             npm i
             npm run build
+      - save_cache:
+          paths: [backend/node_modules]
+          key: backend-build
+
             
   test-frontend:
     docker:
