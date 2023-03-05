@@ -221,6 +221,72 @@ jobs:
       # Here's where you will add some code to rollback on failure
       - destroy-environment:
           workflow_id: ${CIRCLE_WORKFLOW_ID:0:7}
+  deploy-frontend:
+    docker:
+      # Docker image here that supports AWS CLI
+      - image: alpine:3.12.0
+    steps:
+      # Checkout code from git
+      - checkout
+      - run:
+          name: Install dependencies
+          command: |
+            # your code here
+            apk update
+      # install python
+      - run:
+          name: Install python
+          command: |
+            # your code here
+            apk add --update python3
+      # install ansible
+      - run:
+          name: Install ansible
+          command: |
+            # your code here
+            apk add --update ansible
+      # install NodeJS and NPM
+      - run:
+          name: Install NodeJS and NPM
+          command: |
+            # your code here
+            apk add nodejs-current npm
+            node --version
+            npm --version
+      # install aws cli
+      - run:
+          name: Install aws cli
+          command: |
+            # your code here
+            apk add --no-cache aws-cli
+      - run:
+          name: Install tar utility
+          command: |
+            apk add --update tar gzip
+      - run:
+          name: Get backend url
+          command: |
+            # your code here
+            export BACKEND_IP=$(aws ec2 describe-instances \
+              --filters "Name=tag:Name,Values=backend-${CIRCLE_WORKFLOW_ID:0:7}" \
+              --query "Reservations[*].Instances[*].PublicIpAddress" \
+              --output text)
+            export API_URL="http://${BACKEND_IP}:3030"
+            echo "${API_URL}"
+            echo API_URL="http://${BACKEND_IP}:3030" >> frontend/.env
+            cat frontend/.env
+      - run:
+          name: Deploy frontend objects
+          command: |
+            # your code here
+            cd frontend
+            npm install
+            npm run build
+            tar -czvf artifact-"${CIRCLE_WORKFLOW_ID:0:7}".tar.gz dist
+            aws s3 cp dist s3://udapeople-${CIRCLE_WORKFLOW_ID:0:7} --recursive
+      # Here's where you will add some code to rollback on failure
+      - destroy-environment:
+          workflow_id: ${CIRCLE_WORKFLOW_ID:0:7}
           
           
 workflows:
@@ -242,3 +308,5 @@ workflows:
           requires: [deploy-infrastructure]
       - run-migrations:
           requires: [configure-infrastructure]
+      - deploy-frontend:
+          requires: [run-migrations]
